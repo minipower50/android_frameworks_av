@@ -531,8 +531,9 @@ sp<IAudioTrack> AudioFlinger::createTrack(
 
         track = thread->createTrack_l(client, streamType, sampleRate, format,
                 channelMask, frameCount, sharedBuffer, lSessionId, flags, tid, clientUid, &lStatus);
-        LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
-        // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
+
+		 LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
+		// we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
@@ -892,7 +893,7 @@ status_t AudioFlinger::setMasterMute(bool muted)
 
     Mutex::Autolock _l(mLock);
     mMasterMute = muted;
-
+#ifndef ICS_AUDIO_BLOB
     // Set master mute in the HALs which support it.
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         AutoMutex lock(mHardwareLock);
@@ -904,7 +905,7 @@ status_t AudioFlinger::setMasterMute(bool muted)
         }
         mHardwareStatus = AUDIO_HW_IDLE;
     }
-
+#endif
     // Now set the master mute in each playback thread.  Playback threads
     // assigned to HALs which do not have master mute support will apply master
     // mute during the mix operation.  Threads with HALs which do support master
