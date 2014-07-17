@@ -709,6 +709,12 @@ status_t CameraClient::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2) {
     return mHardware->sendCommand(cmd, arg1, arg2);
 }
 
+#ifdef SEMC_ICS_CAMERA_BLOB
+status_t CameraClient::getRecordingBuffer(unsigned int index, sp<MemoryBase>** buffer) {
+    return mHardware->getRecordingBuffer(index, buffer);
+}
+#endif
+
 // ----------------------------------------------------------------------------
 
 void CameraClient::enableMsgType(int32_t msgType) {
@@ -775,6 +781,12 @@ bool CameraClient::lockIfMessageWanted(int32_t msgType) {
 void CameraClient::notifyCallback(int32_t msgType, int32_t ext1,
         int32_t ext2, void* user) {
     LOG2("notifyCallback(%d)", msgType);
+
+    // Ignore CAF_RESTART callbacks from Samsung's camera driver
+    if (msgType == CAMERA_MSG_FOCUS && ext1 == 4) {
+        LOG2("Ignore CAF_RESTART callback");
+        return;
+    }
 
     Mutex* lock = getClientLockFromCookie(user);
     if (lock == NULL) return;
