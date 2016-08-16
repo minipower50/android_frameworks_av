@@ -45,6 +45,7 @@ LOCAL_SRC_FILES:= \
     IRemoteDisplay.cpp \
     IRemoteDisplayClient.cpp \
     IStreamSource.cpp \
+    MediaUtils.cpp \
     Metadata.cpp \
     mediarecorder.cpp \
     IMediaMetadataRetriever.cpp \
@@ -86,10 +87,6 @@ ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
     endif
 endif
 
-ifneq ($(AUDIO_FEATURE_ENABLED_ULTRA_LOW_LATENCY),true)
-    LOCAL_CFLAGS += -DNATIVE_FAST_TRACKS_ONLY
-endif
-
 # for <cutils/atomic-inline.h>
 LOCAL_CFLAGS += -DANDROID_SMP=$(if $(findstring true,$(TARGET_CPU_SMP)),1,0)
 LOCAL_SRC_FILES += SingleStateQueue.cpp
@@ -101,7 +98,7 @@ endif #TARGET_ENABLE_AV_ENHANCEMENTS
 
 #QTI Resampler
 ifeq ($(call is-vendor-board-platform,QCOM),true)
-ifeq ($(strip $(BOARD_USES_QCOM_RESAMPLER)),true)
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_RESAMPLER)),true)
 LOCAL_CFLAGS += -DQTI_RESAMPLER
 endif
 endif

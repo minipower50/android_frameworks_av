@@ -68,7 +68,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 #QTI Resampler
 ifeq ($(call is-vendor-board-platform,QCOM),true)
-ifeq ($(strip $(BOARD_USES_QCOM_RESAMPLER)),true)
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_RESAMPLER)),true)
 LOCAL_SRC_FILES += AudioResamplerQTI.cpp.arm
 LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/mm-audio/audio-src
 LOCAL_SHARED_LIBRARIES += libqct_resampler
@@ -82,6 +82,12 @@ LOCAL_STATIC_LIBRARIES := \
     libcpustats \
     libmedia_helper
 
+ifeq ($(BOARD_HAS_MTK_HARDWARE),true)
+    LOCAL_STATIC_LIBRARIES += libstagefright_audioresamplermtk
+    LOCAL_C_INCLUDES += $(TOP)/hardware/mediatek/media/include
+    LOCAL_SHARED_LIBRARIES += libblisrc
+endif
+
 LOCAL_MODULE:= libaudioflinger
 
 LOCAL_SRC_FILES += FastMixer.cpp FastMixerState.cpp AudioWatchdog.cpp
@@ -91,10 +97,6 @@ LOCAL_CFLAGS += -DSTATE_QUEUE_INSTANTIATIONS='"StateQueueInstantiations.cpp"'
 # Define ENABLE_RESAMPLE_IN_PCM_OFFLOAD_PATH
 ifeq ($(strip $(BOARD_USE_RESAMPLER_IN_PCM_OFFLOAD_PATH)),true)
 LOCAL_CFLAGS += -DENABLE_RESAMPLER_IN_PCM_OFFLOAD_PATH
-endif
-
-ifneq ($(AUDIO_FEATURE_ENABLED_ULTRA_LOW_LATENCY),true)
-LOCAL_CFLAGS += -DNATIVE_FAST_TRACKS_ONLY
 endif
 
 # Define ANDROID_SMP appropriately. Used to get inline tracing fast-path.
@@ -136,6 +138,12 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     liblog
+
+ifeq ($(BOARD_HAS_MTK_HARDWARE),true)
+    LOCAL_STATIC_LIBRARIES += libstagefright_audioresamplermtk
+    LOCAL_C_INCLUDES += $(TOP)/hardware/mediatek/media/include
+    LOCAL_SHARED_LIBRARIES += libblisrc
+endif
 
 LOCAL_MODULE:= test-resample
 

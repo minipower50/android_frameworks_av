@@ -26,6 +26,7 @@
 #include "mkvparser.hpp"
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -40,6 +41,20 @@
 #include <cutils/properties.h>
 
 namespace android {
+
+typedef struct {
+    uint32_t biSize;
+    uint32_t biWidth;
+    uint32_t biHeight;
+    uint16_t biPlanes;
+    uint16_t biBitCount;
+    uint32_t biCompression;
+    uint32_t biSizeImage;
+    uint32_t biXPelsPerMeter;
+    uint32_t biYPelsPerMeter;
+    uint32_t biClrUsed;
+    uint32_t biClrImportant;
+} BITMAPINFOHEADER;
 
 struct DataSourceReader : public mkvparser::IMkvReader {
     DataSourceReader(const sp<DataSource> &source)
@@ -609,7 +624,12 @@ status_t MatroskaSource::read(
                     TRESPASS();
             }
 
-            if (srcOffset + mNALSizeLen + NALsize > srcSize) {
+            if (srcOffset + mNALSizeLen + NALsize <= srcOffset + mNALSizeLen) {
+                frame->release();
+                frame = NULL;
+
+                return ERROR_MALFORMED;
+            } else if (srcOffset + mNALSizeLen + NALsize > srcSize) {
                 break;
             }
 
@@ -879,25 +899,38 @@ status_t addVorbisCodecInfo(
     size_t offset = 1;
     size_t len1 = 0;
     while (offset < codecPrivateSize && codecPrivate[offset] == 0xff) {
+        if (len1 > (SIZE_MAX - 0xff)) {
+            return ERROR_MALFORMED; // would overflow
+        }
         len1 += 0xff;
         ++offset;
     }
     if (offset >= codecPrivateSize) {
         return ERROR_MALFORMED;
     }
+    if (len1 > (SIZE_MAX - codecPrivate[offset])) {
+        return ERROR_MALFORMED; // would overflow
+    }
     len1 += codecPrivate[offset++];
 
     size_t len2 = 0;
     while (offset < codecPrivateSize && codecPrivate[offset] == 0xff) {
+        if (len2 > (SIZE_MAX - 0xff)) {
+            return ERROR_MALFORMED; // would overflow
+        }
         len2 += 0xff;
         ++offset;
     }
     if (offset >= codecPrivateSize) {
         return ERROR_MALFORMED;
     }
+    if (len2 > (SIZE_MAX - codecPrivate[offset])) {
+        return ERROR_MALFORMED; // would overflow
+    }
     len2 += codecPrivate[offset++];
 
-    if (codecPrivateSize < offset + len1 + len2) {
+    if (len1 > SIZE_MAX - len2 || offset > SIZE_MAX - (len1 + len2) ||
+            codecPrivateSize < offset + len1 + len2) {
         return ERROR_MALFORMED;
     }
 
@@ -974,6 +1007,49 @@ void MatroskaExtractor::addTracks() {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
                 } else if (!strcmp("V_VP9", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
+                } else if (!strcmp("V_MS/VFW/FOURCC", codecID)) {
+                    if (codecPrivateSize >= sizeof(BITMAPINFOHEADER)) {
+                        char *fourcc = (char *) &((BITMAPINFOHEADER *) codecPrivate)->biCompression;
+
+                        switch (FOURCC(fourcc[0], fourcc[1], fourcc[2], fourcc[3])) {
+                        case 'XVID':
+                        case 'xvid':
+                        case 'FMP4':
+                        case 'fmp4':
+                        case 'MP4V':
+                        case 'mp4v':
+                            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
+                            break;
+                        case 'H263':
+                        case 'h263':
+                            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_H263);
+                            break;
+                        case 'DIV3':
+                        case 'div3':
+                        case 'DIV4':
+                        case 'div4':
+                            ALOGW("DivX 3.11 codec not supported");
+                            continue;
+                        case 'DIVX':
+                        case 'divx':
+                            ALOGW("DivX 4 codec not supported");
+                            continue;
+                        case 'DX50':
+                        case 'dx50':
+                            ALOGW("DivX 5 codec not supported");
+                            continue;
+                        case 'MP42':
+                        default:
+                            ALOGW("fourcc id: %hhX%hhX%hhX%hhX is not supported\n",
+                                    fourcc[0], fourcc[1], fourcc[2], fourcc[3]);
+                            continue;
+                        }
+
+                        ALOGV("fourcc id: %.4s", fourcc);
+                    } else {
+                        ALOGW("fourcc size: %d is not supported\n", codecPrivateSize);
+                        continue;
+                    }
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;

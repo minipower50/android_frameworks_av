@@ -32,6 +32,9 @@ namespace android {
 class IMemory;
 class Camera;
 class Surface;
+#ifdef MTK_HARDWARE
+struct CameraSourceHandler;
+#endif
 
 class CameraSource : public MediaSource, public MediaBufferObserver {
 public:
@@ -236,9 +239,15 @@ private:
     status_t checkFrameRate(const CameraParameters& params,
                     int32_t frameRate);
 
+    static void adjustIncomingANWBuffer(IMemory* data);
+    static void adjustOutgoingANWBuffer(IMemory* data);
+
     void stopCameraRecording();
     void releaseCamera();
     status_t reset();
+#ifdef MTK_HARDWARE
+    CameraSourceHandler *mMtkCameraSourceHandler;
+#endif
 
     CameraSource(const CameraSource &);
     CameraSource &operator=(const CameraSource &);

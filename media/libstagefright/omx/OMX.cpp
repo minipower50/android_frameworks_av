@@ -170,7 +170,12 @@ void OMX::binderDied(const wp<IBinder> &the_late_who) {
         Mutex::Autolock autoLock(mLock);
 
         ssize_t index = mLiveNodes.indexOfKey(the_late_who);
-        CHECK(index >= 0);
+
+        if (index < 0) {
+            ALOGE("b/27597103, nonexistent observer on binderDied");
+            android_errorWriteLog(0x534e4554, "27597103");
+            return;
+        }
 
         instance = mLiveNodes.editValueAt(index);
         mLiveNodes.removeItemsAt(index);
@@ -183,6 +188,11 @@ void OMX::binderDied(const wp<IBinder> &the_late_who) {
     }
 
     instance->onObserverDied(mMaster);
+}
+
+bool OMX::isSecure(node_id node) {
+    OMXNodeInstance *instance = findInstance(node);
+    return (instance == NULL ? false : instance->isSecure());
 }
 
 bool OMX::livesLocally(node_id node, pid_t pid) {
@@ -223,7 +233,7 @@ status_t OMX::allocateNode(
 
     *node = 0;
 
-    OMXNodeInstance *instance = new OMXNodeInstance(this, observer);
+    OMXNodeInstance *instance = new OMXNodeInstance(this, observer, name);
 
     OMX_COMPONENTTYPE *handle;
     OMX_ERRORTYPE err = mMaster->makeComponentInstance(
@@ -369,6 +379,40 @@ status_t OMX::createInputSurface(
 status_t OMX::signalEndOfInputStream(node_id node) {
     return findInstance(node)->signalEndOfInputStream();
 }
+
+#ifdef MTK_HARDWARE
+ status_t OMX::useBuffer(
+            node_id node, OMX_U32 port_index, unsigned char* virAddr, size_t size,
+            buffer_id *buffer) {
+    return findInstance(node)->useBuffer(
+            port_index, virAddr, size, buffer);
+}
+
+status_t OMX::useBuffer(
+            node_id node, OMX_U32 port_index, unsigned char* virAddr, size_t size, OMX_U32 offset,
+            buffer_id *buffer) {
+    return findInstance(node)->useBuffer(
+            port_index, virAddr, size, offset, buffer);
+}
+
+status_t OMX::registerBuffer(
+        node_id node, OMX_U32 port_index, const sp<IMemoryHeap> &heap) {
+    return findInstance(node)->registerBuffer(
+            port_index, heap);
+}
+
+status_t OMX::registerBuffer2(
+        node_id node, OMX_U32 port_index, const sp<IMemoryHeap> &HeapBase) {
+    return findInstance(node)->registerBuffer2(
+            port_index, HeapBase);
+}
+
+status_t OMX::useIonBuffer(
+        node_id node, OMX_U32 port_index, unsigned char* virAddr, OMX_S32 fd, size_t size, buffer_id *buffer) {
+    return findInstance(node)->useIonBuffer(
+            port_index, virAddr, fd, size, buffer);
+}
+#endif
 
 status_t OMX::allocateBuffer(
         node_id node, OMX_U32 port_index, size_t size,
